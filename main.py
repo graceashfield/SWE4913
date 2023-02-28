@@ -26,19 +26,11 @@ def calculate_mav(frame):
 class EMGData:
     def __init__(self):
         phase = "ramp"
-        with np.load('P09.npz') as fd:  # read data files
-            signal = fd[f"{phase}_emg"]  # signal data
-            prompts = fd[f"{phase}_emg_prompts"]  # prompts
-            trials = fd[f"{phase}_emg_trial"]  # trials
-            channels = fd["emg_variable_names"]  # channel name
-            # print(fd.files)
-            # print(fd['emg_variable_names'])
-            # print(fd['ramp_emg_prompts'])
-            # print(fd['ramp_emg_trial'])
-        self.signal = signal
-        self.prompts = prompts
-        self.trials = trials
-        self.channel = channels
+        with np.load('data/P09.npz') as fd:  # read data files
+            self.signal = fd[f"{phase}_emg"]  # signal data
+            self.prompts = fd[f"{phase}_emg_prompts"]  # prompts
+            self.trials = fd[f"{phase}_emg_trial"]  # trials
+            self.channel = fd["emg_variable_names"]  # channel name
 
 
 class EMGPlotter(QMainWindow):
@@ -125,15 +117,13 @@ class EMGPlotter(QMainWindow):
         self.setCentralWidget(central_widget)
 
     def on_switch_button_clicked(self):
-        # if button is checked
-        if self.switch_button.isChecked():
+        if self.switch_button.isChecked():  # if button is checked
             # setting background color to light-blue
             self.switch_button.setStyleSheet("background-color : lightblue")
             self.dyn_plot()
             self.next_button.setEnabled(False)
             self.previous_button.setEnabled(False)
-        # if it is unchecked
-        else:
+        else:  # if it is unchecked
             # set background color back to light-grey
             self.switch_button.setStyleSheet("background-color : lightgrey")
             self.on_button_clicked()
@@ -195,7 +185,6 @@ class EMGPlotter(QMainWindow):
             self.figure.clear()
             plt = self.figure.add_subplot(111)
             plt.plot(time+(self.x*0.0160), frame)  # plot emg frame
-            # plt.plot(time, frame)  # plot emg frame
             plt.set_xlabel('Time (s)')
             plt.set_ylabel('Amplitude (V)')
             plt.set_title("Trial " + str(self.trial) + " -  Prompt " + str(self.prompt)
@@ -207,17 +196,20 @@ class EMGPlotter(QMainWindow):
             self.wave_label.setText(str(self.wave) + " volts")
             plt.axhline(y=self.mav, color='r', linestyle='dotted', label="MAV")
             plt.text(0+(self.x*0.0160), self.mav, str(self.mav), color='r')
+            plt.margins(0)
             plt.legend()
             self.canvas.draw()
 
     def dyn_plot(self):
         self.figure.clear()
         plt = self.figure.add_subplot(111)
+        # plot EMG
         plt.plot(self.t, self.sample)  # plot emg frame
         plt.set_xlabel('Time (s)')
         plt.set_ylabel('Amplitude (V)')
         plt.set_title("Trial " + str(self.trial) + " -  Prompt " + str(self.prompt)
                       + "\n" + emg_data.channel[self.channel - 1] + " -  Frame " + str(self.x + 1))
+        # plt.margins(0)
         self.canvas.draw()
 
 
