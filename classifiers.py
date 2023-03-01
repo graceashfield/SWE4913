@@ -2,13 +2,21 @@ import sys
 import os
 import copy
 from PyQt6 import QtGui
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer
 import numpy as np
 from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QGroupBox, QLabel, QGridLayout, \
     QMainWindow, QWidget, QPushButton, QFileDialog, QMessageBox, QFrame, QAbstractItemView, QLineEdit
 
 
 def paint_gradient_bar(widget, event):
+    """
+        Paints a gradient bar on the given widget.
+
+        :param widget: The widget to paint on.
+        :type widget: QtGui.QWidget
+        :param event: The paint event.
+        :type event: QtGui.QPaintEvent
+        """
     painter = QtGui.QPainter(widget)
     # gradient = QtGui.QLinearGradient(0, 0, 0, widget.height())
     gradient = QtGui.QLinearGradient(0, 0, widget.width(), 0)
@@ -23,6 +31,12 @@ def paint_gradient_bar(widget, event):
 
 
 def create_legend():
+    """
+        Creates a legend widget with a gradient bar and labels.
+
+        :return: The legend widget.
+        :rtype: QtGui.QWidget
+        """
     legend_widget = QWidget()
     layout = QGridLayout()
     legend_widget.setLayout(layout)
@@ -40,6 +54,14 @@ def create_legend():
 
 
 def get_colour(value):
+    """
+        Returns a QColor object based on the given value.
+
+        :param value: The value used to determine the color.
+        :type value: int
+        :return: The QColor object.
+        :rtype: QtGui.QColor
+        """
     colour = QtGui.QColor(255, 255, 255)
     if value == 0:
         colour = QtGui.QColor(3, 2, 252)
@@ -66,12 +88,29 @@ def get_colour(value):
     return colour
 
 
-# sort dict keys by class
 def sort_key(item):
+    """
+        Returns a tuple used for sorting a list of items.
+
+        The function extracts the first and second elements from the first element of the input item and returns a tuple.
+
+        :param item: The item to extract the elements from.
+        :type item: tuple
+        :return: A tuple used for sorting the items.
+        :rtype: tuple
+        """
     return item[0][0], item[0][1]
 
 
 def count_percentage(numbers):
+    """
+        Calculates the percentage of occurrences of each number in the input list.
+
+        :param numbers: A list of integers.
+        :type numbers: list
+        :return: A dictionary where the keys are the numbers and the values are the percentage of occurrences.
+        :rtype: dict
+        """
     count = {}
     total = len(numbers)
     for num in numbers:
@@ -87,6 +126,17 @@ def count_percentage(numbers):
     return count
 
 
+def clear_table(table, row_num):
+    # Clear the contents of each cell, excluding headers
+    for row in range(table.rowCount()):
+        for col in range(table.columnCount()):
+            table.item(row_num, col).setBackground(QtGui.QColor(220, 220, 220))
+            item = table.item(row, col)
+            if item is not None:
+                item.setText("")
+                item.setBackground(QtGui.QColor("transparent"))
+
+
 class Classifier(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -99,14 +149,14 @@ class Classifier(QMainWindow):
         self.predictions = None
         self.subset = None
         self.cur_individual = 0
-        self.test_data = {}
+        # cur_data = {}
         self.final_dict = {}
         self.individual = {}
         self.dictio = {1: "NM", 2: "WF", 3: "WE", 4: "WP", 5: "WS", 6: "CG", 7: "HO"}
 
-        # Adding the outermost keys to list (trial number)
-        for i in range(1, 9):
-            self.test_data[i] = {}
+        # # Adding the outermost keys to list (trial number)
+        # for i in range(1, 9):
+        #     cur_data[i] = {}
 
         self.setWindowTitle("EMG Classifier")
         self.showMaximized()
@@ -131,13 +181,15 @@ class Classifier(QMainWindow):
         self.data_button.clicked.connect(self.data_button_clicked)
         self.data_button.setCheckable(True)
         self.data_button.setEnabled(False)
-        
+
         self.prev_button = QPushButton("Previous Data")
         self.next_button = QPushButton("Next Data")
         self.prev_button.setFixedWidth(130)
         self.next_button.setFixedWidth(130)
-        self.prev_button.clicked.connect(self.on_previous)
-        self.next_button.clicked.connect(self.on_next)
+        # self.prev_button.clicked.connect(self.on_previous)
+        # self.next_button.clicked.connect(self.on_next)
+        self.prev_button.clicked.connect(self.prev_next)
+        self.next_button.clicked.connect(self.prev_next)
         self.prev_button.hide()
         self.next_button.hide()
         self.current_field = QLabel("")
@@ -206,19 +258,34 @@ class Classifier(QMainWindow):
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
 
-    # Update data on user input
     def data_update(self):
+        """
+        Updates the displayed data based on the user's input.
+
+        Retrieves data from the file specified by the user's input, clears all tables, and updates the current field.
+        """
         data_input = self.input_box.text() + ".npz"
-        self.cur_individual = 0
-        if self.individual[data_input]:
+        if data_input in self.individual:
+            self.cur_individual = list(self.individual.keys()).index(data_input)
+            for x in range(len(self.all_tables)):
+                clear_table(self.all_tables[x], x)
             self.current_field.setText(str(data_input))
             self.percentage_data(self.individual[data_input])
+            self.prev_button.setEnabled(self.cur_individual > 0)
+            self.next_button.setEnabled(self.cur_individual < len(self.individual.keys()) - 1)
+        else:
+            QMessageBox.critical(self, "Error", "Please input a valid file")
 
     # # If the user typed something, start the timer
     # def on_text_changed(self):
     #     self.input_box.timer.start()
 
     def file_select(self):
+        """
+            Opens a file dialog to select a directory containing NPZ files, then loads the data from the selected file.
+            If the file contains the required data arrays, populates the UI with the data and enables the data button.
+            If the file is not valid, displays an error message.
+            """
         # file_name = QFileDialog.getOpenFileName(self, "", "", "NPZ Files (*.npz)")
         dir_path = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
         if dir_path:
@@ -240,7 +307,19 @@ class Classifier(QMainWindow):
                     except KeyError:
                         QMessageBox.critical(self, "Error", "Please select a valid file")
 
-    def create_table(self, w, h, b, num):
+    def create_table(self, width, height, cell, num):
+        """
+            Creates a QTableWidget instance with customized properties and headers.
+
+            Args:
+                width (int): the maximum width of the table
+                height (int): the maximum height of the table
+                cell (int): the size of each cell (width and height are proportional to it)
+                num (int): the index of the vertical header to be removed
+
+            Returns:
+                QTableWidget: a QTableWidget instance with customized properties and headers
+            """
         table = QTableWidget()
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -258,17 +337,22 @@ class Classifier(QMainWindow):
             table.setVerticalHeaderItem(count, item)
             count += 1
 
-        table.setMaximumSize(w, h)
+        table.setMaximumSize(width, height)
         for x in range(len(header_labels)):
-            table.setColumnWidth(x, b)
+            table.setColumnWidth(x, cell)
             if x == 7:
-                table.setColumnWidth(x, b + 20)
-            table.setRowHeight(x, round(b / 1.6))
+                table.setColumnWidth(x, cell + 20)
+            table.setRowHeight(x, round(cell / 1.6))
             for y in range(len(header_labels)):
                 table.setItem(y, x, QTableWidgetItem(""))
         return table
 
     def row_button_clicked(self):
+        """
+            Function to handle the "View All Rows" / "View Less Rows" button clicked event.
+            When the button is checked, it shows all rows in the tables and increases their maximum size.
+            When the button is unchecked, it hides all rows in the tables except for the headers and reduces their maximum size.
+            """
         if self.row_button.isChecked():
             self.row_button.setText("View Less Rows")
             for x in range(len(self.all_tables)):
@@ -281,7 +365,13 @@ class Classifier(QMainWindow):
                 self.all_tables[x].setMaximumSize(441, 194)
 
     def data_button_clicked(self):
+        """
+            This function is called when the "View Individual Data" toggle button is clicked.
+            If the button is checked, it displays the data for the currently selected field.
+            If the button is unchecked, it returns to displaying the overall data.
+            """
         if self.data_button.isChecked():
+            self.cur_individual = 0
             self.data_button.setText("View All Data")
             data = list(self.individual.keys())[self.cur_individual]
             self.current_field.setText(str(data))
@@ -291,27 +381,37 @@ class Classifier(QMainWindow):
             self.prev_button.show()
             self.input_box.show()
         else:  # if it is unchecked
+            self.cur_individual = 0
             self.data_button.setText("View Individual Data")
             self.percentage_data(self.final_dict)
-            self.cur_individual = 0
             self.current_field.hide()
             self.next_button.hide()
             self.prev_button.hide()
             self.input_box.hide()
             self.input_box.clear()
 
-    def on_previous(self):
-        self.cur_individual -= 1
-        if self.individual and len(self.individual.keys()) > self.cur_individual >= 0:
-            self.input_box.clear()
-            data = list(self.individual.keys())[self.cur_individual]
-            self.current_field.setText(str(data))
-            print(data, self.individual[data])
-            self.percentage_data(self.individual[data])
+    def prev_next(self):
+        """
+            Update current individual and GUI display based on button click.
 
-    def on_next(self):
-        self.cur_individual += 1
-        if self.individual and len(self.individual.keys()) > self.cur_individual >= 0:
+            Decrement cur_individual if "previous" button is clicked (unless already at 0).
+            Increment cur_individual if "next" button is clicked (unless at end of list).
+            Enable/disable "previous" and "next" buttons based on cur_individual.
+            Update GUI tables and input fields to display current individual data.
+            """
+        sender_button = app.sender()
+        if sender_button == self.prev_button:
+            print("prev", sender_button)
+            self.cur_individual = max(0, self.cur_individual - 1)
+            self.prev_button.setEnabled(self.cur_individual > 0)
+            self.next_button.setEnabled(self.cur_individual < len(self.individual.keys()) - 1)
+        elif sender_button == self.next_button:
+            print("next", sender_button)
+            self.cur_individual = min(len(self.individual.keys()) - 1, self.cur_individual + 1)
+            self.prev_button.setEnabled(self.cur_individual > 0)
+            self.next_button.setEnabled(self.cur_individual < len(self.individual.keys()) - 1)
+        for x in range(len(self.all_tables)):
+            clear_table(self.all_tables[x], x)
             self.input_box.clear()
             data = list(self.individual.keys())[self.cur_individual]
             self.current_field.setText(str(data))
@@ -319,6 +419,16 @@ class Classifier(QMainWindow):
             self.percentage_data(self.individual[data])
 
     def data(self):
+        """
+            Processes the data by extracting the relevant information
+            for each trial and classification, sorting it, and storing it
+            in a nested dictionary with trial numbers as outer keys and
+            classification pairs as inner keys.
+            """
+        cur_data = {}
+        # Adding the outermost keys to list (trial number)
+        for i in range(1, 9):
+            cur_data[i] = {}
         for trial_num in range(1, 9):  # all 8 trials **make dynamic**
             trial_idx = self.steady[:, 3] == trial_num  # get class number
             self.subset = self.steady[trial_idx]  # only data for one trial
@@ -326,19 +436,26 @@ class Classifier(QMainWindow):
             for x in range(len(self.subset)):
                 classifier.insert(x, self.subset[x, 2])  # classifier
                 cur_frame = self.subset[x, 0]  # current start frame
-                if x != 0:
+                if x != 0:  # start after first data entry
                     prev_frame = self.subset[x - 1, 1]  # previous end frame
                     trial_idx = self.trials == trial_num  # get trial data
                     subset = self.predictions[trial_idx]  # get predictions data
                     if cur_frame - prev_frame > 1:  # if it does not go directly from one class to other
-                        self.test_data[trial_num][classifier[x - 1], classifier[x]] = list(
+                        cur_data[trial_num][classifier[x - 1], classifier[x]] = list(
                             np.array(subset[prev_frame:cur_frame]))
             # Sorting the values in the dictionary
-            self.test_data[trial_num] = dict(sorted(self.test_data[trial_num].items(), key=sort_key))
-        # print(self.file_name, "test", self.test_data)
+            cur_data[trial_num] = dict(sorted(cur_data[trial_num].items(), key=sort_key))
+        self.trial_sorting(cur_data)
 
-        #  combine all trial data into one
-        data_copy = copy.deepcopy(self.test_data)
+    def trial_sorting(self, data):
+        """
+            Sorts the data into two dictionaries, `self.final_dict` and `self.individual`, by aggregating and
+            storing the data of all individuals in `self.final_dict` and storing the data of the current
+            individual in `self.individual`.
+
+            :param data: A dictionary containing data for all individuals, sorted by trial and class.
+            """
+        data_copy = copy.deepcopy(data)
         for trial in data_copy:
             inner_dict = data_copy[trial].copy()
             for inner_key in inner_dict:
@@ -348,9 +465,8 @@ class Classifier(QMainWindow):
                     self.final_dict[inner_key] = inner_dict[inner_key]
         self.percentage_data(self.final_dict)
 
-        cur_individual = {}
-        #  individual person data
-        data_copy2 = copy.deepcopy(self.test_data)
+        cur_individual = {}  # individual person data
+        data_copy2 = copy.deepcopy(data)
         for trial in data_copy2:
             inner_dict = data_copy2[trial].copy()
             for inner_key in inner_dict:
@@ -359,10 +475,18 @@ class Classifier(QMainWindow):
                 else:
                     cur_individual[inner_key] = inner_dict[inner_key]
         self.individual[self.file_name] = cur_individual  # store individual data
-        # print(self.file_name, self.individual)
+        # print("bruh", self.file_name, self.individual)
 
     # def percentage_data(self, trial_num):
     def percentage_data(self, data):
+        """
+            Calculates the percentage of transitions between classes and populates a table
+            with the percentage values. It also sets the background color of the cells in
+            the table based on the percentage value. If there is no probability for a
+            transition, the function sets the cell value to '-' and the total frames to 0.
+
+            :param data: A dictionary containing data for all individuals, sorted by trial and class.
+            """
         percentages = {}
         # print("data", data)
         for class_trans, numbers in data.items():
@@ -381,14 +505,14 @@ class Classifier(QMainWindow):
                 self.all_tables[table_num].setItem(row, 7, QTableWidgetItem(str(total_frames)))
 
         # if all transitions have no probability
-        for x in range(0, 6):
-            for y in range(0, 6):
+        for x in range(0, 7):
+            for row in range(self.all_tables[x].rowCount()):
                 for col in range(self.all_tables[x].columnCount()):
-                    item = self.all_tables[x].item(y, col)
-                    if item is not None and not item.text() and item.background().color() != QtGui.QColor(220, 220,
-                                                                                                          220):
-                        self.all_tables[x].setItem(y, col, QTableWidgetItem("-"))
-                        self.all_tables[x].setItem(y, 7, QTableWidgetItem("0"))
+                    item = self.all_tables[x].item(row, col)
+                    if item is not None and item.text() == "" and item.background().color() != QtGui.QColor(220, 220,
+                                                                                                            220):
+                        self.all_tables[x].setItem(row, col, QTableWidgetItem("-"))
+                        self.all_tables[x].setItem(row, 7, QTableWidgetItem("0"))
 
 
 if __name__ == "__main__":
