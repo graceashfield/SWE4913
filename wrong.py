@@ -212,6 +212,7 @@ class Classifier(QMainWindow):
             self.file_name.setText(file_name)
             try:
                 with np.load(file_path) as fd:  # read data files
+                    print(file_path)
                     self.predictions = fd["predictions"]
                     self.prob = fd["probabilities"]
                     self.trials = fd["trials"]

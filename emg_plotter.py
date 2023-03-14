@@ -8,8 +8,16 @@ from numpy import mean, absolute
 import math
 
 
-# calculate the wavelength
 def wavelength(frame):
+    """
+        Calculates the wavelength of an EMG signal for a given frame.
+
+        :param frame: An array of EMG data for a single frame.
+        :type frame: numpy.ndarray
+
+        :return: The wavelength of the EMG signal.
+        :rtype: float
+    """
     wave = 0  # cumulative sum
     for val in range(frame.size):
         if val > 0:  # skip first value
@@ -17,13 +25,23 @@ def wavelength(frame):
     return wave
 
 
-# calculate mean absolute value
 def calculate_mav(frame):
+    """
+        Calculates the mean absolute value of an EMG signal for a given frame.
+
+        :param frame: An array of EMG data for a single frame.
+        :type frame: numpy.ndarray
+
+        :return: The mean absolute value of the EMG signal.
+        :rtype: float
+    """
     return mean(absolute(frame))
 
 
-# load files from npz
 class EMGData:
+    """
+        Loads EMG data from an npz file.
+    """
     def __init__(self):
         phase = "ramp"
         with np.load('data/P09.npz') as fd:  # read data files
@@ -34,6 +52,9 @@ class EMGData:
 
 
 class EMGPlotter(QMainWindow):
+    """
+        Creates a GUI for plotting EMG signals and displaying calculated features.
+        """
     def __init__(self):
         super().__init__()
 
@@ -130,15 +151,41 @@ class EMGPlotter(QMainWindow):
 
     # move to previous or next frames
     def on_previous(self):
+        """
+            Move to the previous frame.
+
+            :param self: The EMGPlotter object.
+            :type self: EMGPlotter
+
+            :return: None.
+            :rtype: None
+        """
         self.x -= 1
         self.frame_plot(self.x)
 
     def on_next(self):
+        """
+            Move to the next frame.
+
+            :param self: The EMGPlotter object.
+            :type self: EMGPlotter
+
+            :return: None.
+            :rtype: None
+        """
         self.x += 1
         self.frame_plot(self.x)
 
     def on_button_clicked(self):
-        # get numerical values
+        """
+            Generate EMG data and enable buttons.
+
+            :param self: The EMGPlotter object.
+            :type self: EMGPlotter
+
+            :return: None.
+            :rtype: None
+        """
         self.prompt = int(self.prompt_select.currentText())
         self.trial = int(self.trial_select.currentText())
         channel = int(self.channel_select.currentText())
@@ -148,6 +195,21 @@ class EMGPlotter(QMainWindow):
         self.switch_button.setEnabled(True)
 
     def generate_data(self, prompt, trial, channel):
+        """
+            Generate EMG data for the given prompt, trial, and channel.
+
+            :param self: The EMGPlotter object.
+            :type self: EMGPlotter
+            :param prompt: The prompt number.
+            :type prompt: int
+            :param trial: The trial number.
+            :type trial: int
+            :param channel: The channel number.
+            :type channel: int
+
+            :return: None.
+            :rtype: None
+        """
         prompt_idx = emg_data.prompts == prompt  # prompt number
         trial_idx = emg_data.trials == trial  # trial number
         subset = emg_data.signal[trial_idx * prompt_idx]  # intersection of trial and prompt
@@ -155,6 +217,19 @@ class EMGPlotter(QMainWindow):
         self.set_data(s, channel)
 
     def set_data(self, sample, channel_num):
+        """
+            Set the EMG data for the given sample and channel number.
+
+            :param self: The EMGPlotter object.
+            :type self: EMGPlotter
+            :param sample: The EMG data for the given channel.
+            :type sample: array
+            :param channel_num: The channel number.
+            :type channel_num: int
+
+            :return: None.
+            :rtype: None
+        """
         length = len(sample)  # length in samples
         fs = 2000  # sampling frequency
         dt = 1 / fs  # sampling duration
@@ -170,6 +245,17 @@ class EMGPlotter(QMainWindow):
         self.frame_plot(self.x)
 
     def frame_plot(self, x):
+        """
+            Plot the EMG data for the current frame.
+
+            :param self: The EMGPlotter object.
+            :type self: EMGPlotter
+            :param x: The frame number.
+            :type x: int
+
+            :return: None.
+            :rtype: None
+        """
         if x < (self.num_frames * 10):  # if there is still emg data
             # frame bounds
             low = int(x * (self.len_frames / 10))
@@ -180,6 +266,19 @@ class EMGPlotter(QMainWindow):
         self.plot_emg(self.time_scale, self.frame)
 
     def plot_emg(self, time, frame):
+        """
+            Plot the EMG data for the current frame.
+
+            :param self: The EMGPlotter object.
+            :type self: EMGPlotter
+            :param time: The time scale.
+            :type time: array
+            :param frame: The EMG data for the current frame.
+            :type frame: array
+
+            :return: None.
+            :rtype: None
+        """
         # if signal exists
         if time.size == frame.size:
             self.figure.clear()
@@ -201,6 +300,15 @@ class EMGPlotter(QMainWindow):
             self.canvas.draw()
 
     def dyn_plot(self):
+        """
+            Plot the EMG data for the entire duration of the record.
+
+            :param self: The EMGPlotter object.
+            :type self: EMGPlotter
+
+            :return: None.
+            :rtype: None
+        """
         self.figure.clear()
         plt = self.figure.add_subplot(111)
         # plot EMG
