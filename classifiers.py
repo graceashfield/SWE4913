@@ -143,16 +143,10 @@ class Classifier(QMainWindow):
 
         self.file_names = None
         self.file_name = None
-        self.steady = None
-        self.truth = None
-        self.trials = None
-        self.prob = None
-        self.predictions = None
-        self.subset = None
         self.cur_individual = 0
         self.cur_data = {}
         self.final_dict = {}
-        self.individual = {}
+        self.all_data = {}
         self.dictio = {1: "NM", 2: "WF", 3: "WE", 4: "WP", 5: "WS", 6: "CG", 7: "HO"}
 
         self.setWindowTitle("EMG Classifier")
@@ -263,7 +257,7 @@ class Classifier(QMainWindow):
         sender_button = app.sender()
         if sender_button == self.input_box:
             data_input = self.input_box.text().upper() + ".npz"
-            if data_input in self.individual:
+            if data_input in self.all_data:
                 index = self.file_selector.findText(data_input)
                 self.file_selector.setCurrentIndex(index)
             else:
@@ -271,14 +265,14 @@ class Classifier(QMainWindow):
         else:
             data_input = self.file_selector.currentText()
 
-        if data_input in self.individual:
-            self.cur_individual = list(self.individual.keys()).index(data_input)
+        if data_input in self.all_data:
+            self.cur_individual = list(self.all_data.keys()).index(data_input)
             for x in range(len(self.all_tables)):
                 clear_table(self.all_tables[x], x)
             self.current_field.setText(str(data_input))
-            self.percentage_data(self.individual[data_input])
+            self.percentage_data(self.all_data[data_input]["individual"])
             self.prev_button.setEnabled(self.cur_individual > 0)
-            self.next_button.setEnabled(self.cur_individual < len(self.individual.keys()) - 1)
+            self.next_button.setEnabled(self.cur_individual < len(self.all_data.keys()) - 1)
 
     def file_select(self):
         """
@@ -290,26 +284,30 @@ class Classifier(QMainWindow):
         dir_path = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
         if dir_path:
             self.clear()
+            self.data_button.setChecked(False)
+            self.data_button_clicked()
             self.file_names = os.listdir(dir_path)
             self.file_names.sort()
             self.file_selector.addItems(self.file_names)
+
+            self.all_data = {}  # create a dictionary to hold all data for all files
             for file_name in self.file_names:
                 if os.path.isfile(os.path.join(dir_path, file_name)):
                     self.data_set.setText(os.path.basename(os.path.normpath(dir_path)))
-                    self.file_name = file_name
                     file_path = os.path.join(dir_path, file_name)
                     try:
                         with np.load(file_path) as fd:  # read data files
-                            self.predictions = fd["predictions"]
-                            self.prob = fd["probabilities"]
-                            self.trials = fd["trials"]
-                            self.truth = fd["ground_truth_table"]
-                            self.steady = fd["steady_state_table"]
-                            self.individual[file_name] = {}
-                            self.data()
-                            self.data_button.setEnabled(True)
+                            data = {"predictions": fd["predictions"], "probabilities": fd["probabilities"],
+                                    "trials": fd["trials"], "truth": fd["ground_truth_table"],
+                                    "steady": fd["steady_state_table"],
+                                    "individual": {}}  # create a dictionary to hold data for each file
+                            self.all_data[file_name] = data  # add data for this file to the all_data dictionary
                     except KeyError:
                         QMessageBox.critical(self, "Error", "Please select a valid file")
+
+            # Call self.data() once after all files have been read and their data has been stored
+            self.data(self.all_data)
+            self.data_button.setEnabled(True)
 
     def create_table(self, width, height, cell, num):
         """
@@ -378,9 +376,11 @@ class Classifier(QMainWindow):
         if self.data_button.isChecked():
             self.cur_individual = 0
             self.data_button.setText("View All Data")
-            data = list(self.individual.keys())[self.cur_individual]
+            for x in range(len(self.all_tables)):
+                clear_table(self.all_tables[x], x)
+            data = list(self.all_data.keys())[self.cur_individual]
             self.current_field.setText(str(data))
-            self.percentage_data(self.individual[data])
+            self.percentage_data(self.all_data[data]["individual"])
             self.current_field.show()
             self.file_selector.show()
             self.next_button.show()
@@ -389,6 +389,8 @@ class Classifier(QMainWindow):
         else:  # if it is unchecked
             self.cur_individual = 0
             self.data_button.setText("View Individual Data")
+            for x in range(len(self.all_tables)):
+                clear_table(self.all_tables[x], x)
             self.percentage_data(self.final_dict)
             self.current_field.hide()
             self.file_selector.hide()
@@ -407,61 +409,62 @@ class Classifier(QMainWindow):
         """
         sender_button = app.sender()
         if sender_button == self.prev_button:
-            print("prev", sender_button)
             self.cur_individual = max(0, self.cur_individual - 1)
-            print('prev', self.cur_individual)
             self.prev_button.setEnabled(self.cur_individual > 0)
-            self.next_button.setEnabled(self.cur_individual < len(self.individual.keys()) - 1)
+            self.next_button.setEnabled(self.cur_individual < len(self.all_data.keys()) - 1)
         elif sender_button == self.next_button:
-            print("next", sender_button)
-            self.cur_individual = min(len(self.individual.keys()) - 1, self.cur_individual + 1)
-            print('next', self.cur_individual)
+            self.cur_individual = min(len(self.all_data.keys()) - 1, self.cur_individual + 1)
             self.prev_button.setEnabled(self.cur_individual > 0)
-            self.next_button.setEnabled(self.cur_individual < len(self.individual.keys()) - 1)
+            self.next_button.setEnabled(self.cur_individual < len(self.all_data.keys()) - 1)
         for x in range(len(self.all_tables)):
             clear_table(self.all_tables[x], x)
             self.input_box.clear()
-            data = list(self.individual.keys())[self.cur_individual]
+            data = list(self.all_data.keys())[self.cur_individual]
             self.current_field.setText(str(data))
             index = self.file_selector.findText(str(data))
             self.file_selector.setCurrentIndex(index)
-            print(data, self.individual[data])
-            self.percentage_data(self.individual[data])
+            self.percentage_data(self.all_data[data]["individual"])
 
-    def data(self):
+    def data(self, all_data):
         """
-            Processes the data by extracting the relevant information
-            for each trial and classification, sorting it, and storing it
-            in a nested dictionary with trial numbers as outer keys and
-            classification pairs as inner keys.
-            """
-        self.cur_data = {}
+        Processes the data by extracting the relevant information
+        for each trial and classification, sorting it, and storing it
+        in a nested dictionary with trial numbers as outer keys and
+        classification pairs as inner keys.
+        """
+        self.prev_button.setEnabled(self.cur_individual > 0)
+        self.next_button.setEnabled(self.cur_individual < len(self.all_data.keys()) - 1)
+        for file_name, data in all_data.items():  # loop over all files and their data
+            self.cur_data = {}
+            for i in range(1, 9):  # Adding the outermost keys to list (trial number)
+                self.cur_data[i] = {}
+            for trial_num in range(1, 9):  # all 8 trials **make dynamic**
+                trial_idx = data["steady"][:, 3] == trial_num  # get class number
+                subset = data["steady"][trial_idx]  # only data for one trial
+                classifier = []
+                for x in range(len(subset)):
+                    classifier.insert(x, subset[x, 2])  # classifier
+                    cur_frame = subset[x, 0]  # current start frame
+                    if x != 0:  # start after first data entry
+                        prev_frame = subset[x - 1, 1]  # previous end frame
+                        trial_idx = data["trials"] == trial_num  # get trial data
+                        predictions = data["predictions"][trial_idx]  # get predictions data
+                        if cur_frame - prev_frame > 1:  # if it does not go directly from one class to other
+                            self.cur_data[trial_num][classifier[x - 1], classifier[x]] = list(
+                                np.array(predictions[prev_frame:cur_frame]))
 
-        for i in range(1, 9):  # Adding the outermost keys to list (trial number)
-            self.cur_data[i] = {}
-        for trial_num in range(1, 9):  # all 8 trials **make dynamic**
-            trial_idx = self.steady[:, 3] == trial_num  # get class number
-            self.subset = self.steady[trial_idx]  # only data for one trial
-            classifier = []
-            for x in range(len(self.subset)):
-                classifier.insert(x, self.subset[x, 2])  # classifier
-                cur_frame = self.subset[x, 0]  # current start frame
-                if x != 0:  # start after first data entry
-                    prev_frame = self.subset[x - 1, 1]  # previous end frame
-                    trial_idx = self.trials == trial_num  # get trial data
-                    subset = self.predictions[trial_idx]  # get predictions data
-                    if cur_frame - prev_frame > 1:  # if it does not go directly from one class to other
-                        self.cur_data[trial_num][classifier[x - 1], classifier[x]] = list(
-                            np.array(subset[prev_frame:cur_frame]))
             # Sorting the values in the dictionary
-            self.cur_data[trial_num] = dict(sorted(self.cur_data[trial_num].items(), key=sort_key))
-        self.trial_sorting(self.cur_data)
+            self.cur_data = {trial_num: dict(sorted(values.items(), key=sort_key)) for trial_num, values in
+                             self.cur_data.items()}
 
-    def trial_sorting(self, data):
+            self.trial_sorting(self.cur_data, file_name)
+
+    def trial_sorting(self, data, file_name):
         """
             Sorts the data into two dictionaries, `self.final_dict` and `self.individual`, by aggregating and
             storing the data of all individuals in `self.final_dict` and storing the data of the current
             individual in `self.individual`.
+            :param file_name: Current file
             :param data: A dictionary containing data for all individuals, sorted by trial and class.
         """
         data_copy = copy.deepcopy(data)
@@ -483,7 +486,7 @@ class Classifier(QMainWindow):
                     cur_individual[inner_key].extend(inner_dict[inner_key])
                 else:
                     cur_individual[inner_key] = inner_dict[inner_key]
-        self.individual[self.file_name] = cur_individual  # store individual data
+        self.all_data[file_name]["individual"] = cur_individual  # store individual data
 
     # def percentage_data(self, trial_num):
     def percentage_data(self, data):
@@ -524,16 +527,10 @@ class Classifier(QMainWindow):
         self.file_selector.clear()
         self.file_name = None
         self.file_names = None
-        self.steady = None
-        self.truth = None
-        self.trials = None
-        self.prob = None
-        self.predictions = None
-        self.subset = None
         self.cur_individual = 0
         self.cur_data = {}
         self.final_dict = {}
-        self.individual = {}
+        self.all_data = {}
 
 
 if __name__ == "__main__":
