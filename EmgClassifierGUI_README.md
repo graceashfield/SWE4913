@@ -6,7 +6,7 @@ This code requires the following libraries to be installed:
 - PyQt6
 - numpy
 
-### Usage
+### Running the program
 To use the EMG Classifier, follow these steps:
 1. Clone or download the code from the Github repository
 2. Open the terminal and navigate to the directory containing the emg_classifier_gui.py file
