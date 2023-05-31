@@ -8,9 +8,9 @@ This code requires the following libraries to be installed:
 
 ### Usage
 To use the EMG Classifier, follow these steps:
-Clone or download the code from the Github repository
-Open the terminal and navigate to the directory containing the emg-plotter.py file
-Run the command python emg_plotter.py to launch the program
+1. Clone or download the code from the Github repository
+2. Open the terminal and navigate to the directory containing the emg_classifier_gui.py file
+3. Run the command python emg_classifier_gui.py to launch the program
 
 ### Using the GUI
 Launch the application and select a dataset using the "Select Data" button.
