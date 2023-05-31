@@ -2,10 +2,11 @@ import sys
 import os
 import copy
 from PyQt6 import QtGui
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QCoreApplication
 import numpy as np
 from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QGroupBox, QLabel, QGridLayout, \
-    QMainWindow, QWidget, QPushButton, QFileDialog, QMessageBox, QFrame, QAbstractItemView, QLineEdit, QComboBox
+    QMainWindow, QWidget, QPushButton, QFileDialog, QMessageBox, QFrame, QAbstractItemView, QLineEdit, QComboBox, \
+    QProgressDialog
 
 
 def paint_gradient_bar(widget, event):
@@ -165,6 +166,7 @@ class Classifier(QMainWindow):
         groupbox0.setMaximumSize(200, 100)
         layout.addWidget(groupbox0, 0, 0)
 
+        # UI layout
         groupbox1 = QGroupBox()
         grid1 = QGridLayout()
         groupbox1.setLayout(grid1)
@@ -242,6 +244,11 @@ class Classifier(QMainWindow):
         self.grid4.addWidget(self.all_tables[4], 1, 1, 1, 1)
         self.grid4.addWidget(self.all_tables[5], 1, 2, 1, 1)
         self.grid4.addWidget(self.all_tables[6], 2, 1, 1, 1)
+
+        screenshot_button = QPushButton("Take Screenshot")
+        screenshot_button.clicked.connect(self.screenshot)
+        self.grid4.addWidget(screenshot_button, 2, 2, 1, 1)
+
         groupbox4.setLayout(self.grid4)
         layout.addWidget(groupbox4, 1, 0, 6, 6)
 
@@ -280,7 +287,6 @@ class Classifier(QMainWindow):
             If the file contains the required data arrays, populates the UI with the data and enables the data button.
             If the file is not valid, displays an error message.
         """
-        # file_name = QFileDialog.getOpenFileName(self, "", "", "NPZ Files (*.npz)")
         dir_path = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
         if dir_path:
             self.clear()
@@ -291,12 +297,20 @@ class Classifier(QMainWindow):
             self.file_selector.addItems(self.file_names)
 
             self.all_data = {}  # create a dictionary to hold all data for all files
+            # # Progress loading bar logic
+            # progress = QProgressDialog("Loading files...", "Cancel", 0, len(self.file_names), self)
+            # progress.setWindowModality(Qt.WindowModality.WindowModal)
+            # progress.setWindowTitle("Loading")
+            # progress.show()
+
+            # Loading files
+            # for i, file_name in enumerate(self.file_names):
             for file_name in self.file_names:
                 if os.path.isfile(os.path.join(dir_path, file_name)):
                     self.data_set.setText(os.path.basename(os.path.normpath(dir_path)))
                     file_path = os.path.join(dir_path, file_name)
                     try:
-                        with np.load(file_path) as fd:  # read data files
+                        with np.load(file_path, allow_pickle=False) as fd:  # read data files
                             data = {"predictions": fd["predictions"], "probabilities": fd["probabilities"],
                                     "trials": fd["trials"], "truth": fd["ground_truth_table"],
                                     "steady": fd["steady_state_table"],
@@ -304,6 +318,15 @@ class Classifier(QMainWindow):
                             self.all_data[file_name] = data  # add data for this file to the all_data dictionary
                     except KeyError:
                         QMessageBox.critical(self, "Error", "Please select a valid file")
+                        break
+                    except ValueError:
+                        QMessageBox.critical(self, "Error", "Cannot load file containing invalid data")
+                        break
+                    # progress.setValue(i + 1)
+                    # QCoreApplication.processEvents()  # to update the dialog and allow cancellation
+                else:
+                    QMessageBox.critical(self, "Error", "Please select a valid directory")
+                    break
 
             # Call self.data() once after all files have been read and their data has been stored
             self.data(self.all_data)
@@ -434,7 +457,16 @@ class Classifier(QMainWindow):
         """
         self.prev_button.setEnabled(self.cur_individual > 0)
         self.next_button.setEnabled(self.cur_individual < len(self.all_data.keys()) - 1)
-        for file_name, data in all_data.items():  # loop over all files and their data
+
+        # Progress bar
+        progress = QProgressDialog("Loading files...", None, 0, len(all_data), self)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setWindowTitle("Loading")
+        progress.show()
+
+        # for file_name, data in all_data.items():  # loop over all files and their data
+        for num_files, (file_name, data) in enumerate(all_data.items()):
+            # Progress loading bar logic
             self.cur_data = {}
             for i in range(1, 9):  # Adding the outermost keys to list (trial number)
                 self.cur_data[i] = {}
@@ -458,6 +490,8 @@ class Classifier(QMainWindow):
                              self.cur_data.items()}
 
             self.trial_sorting(self.cur_data, file_name)
+            progress.setValue(num_files+1)
+            QCoreApplication.processEvents()  # to update the dialog and allow cancellation
 
     def trial_sorting(self, data, file_name):
         """
@@ -531,6 +565,22 @@ class Classifier(QMainWindow):
         self.cur_data = {}
         self.final_dict = {}
         self.all_data = {}
+
+    def screenshot(self):
+        screen = QApplication.primaryScreen()
+        screenshot = screen.grabWindow(self.winId())
+
+        # save as dataSet_fileName.png
+        if self.data_button.isChecked():
+            print(self.current_field)
+            file_name, _ = QFileDialog.getSaveFileName(self, "Save Screenshot", self.data_set.text() + "_" +
+                                                       os.path.splitext(self.current_field.text())[0] + ".png",
+                                                       "Images (*.png *.xpm *.jpg)")
+        else:
+            file_name, _ = QFileDialog.getSaveFileName(self, "Save Screenshot", self.data_set.text() + ".png",
+                                                       "Images (*.png *.xpm *.jpg)")
+
+        screenshot.save(file_name)
 
 
 if __name__ == "__main__":
