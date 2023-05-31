@@ -3,11 +3,14 @@ This code provides a graphical user interface (GUI) for an EMG classifier. It al
 
 ### Requirements
 This code requires the following libraries to be installed:
+- PyQt6
+- numpy
 
-PyQt6
-numpy
-Usage
+### Usage
 To use the EMG Classifier, follow these steps:
+Clone or download the code from the Github repository
+Open the terminal and navigate to the directory containing the emg-plotter.py file
+Run the command python emg_plotter.py to launch the program
 
 ### Using the GUI
 Launch the application and select a dataset using the "Select Data" button.
