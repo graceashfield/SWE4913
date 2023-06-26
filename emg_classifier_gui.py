@@ -4,9 +4,14 @@ import copy
 from PyQt6 import QtGui
 from PyQt6.QtCore import Qt, QTimer, QCoreApplication
 import numpy as np
+import pandas as pd
+import openpyxl
 from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QGroupBox, QLabel, QGridLayout, \
     QMainWindow, QWidget, QPushButton, QFileDialog, QMessageBox, QFrame, QAbstractItemView, QLineEdit, QComboBox, \
     QProgressDialog
+from openpyxl.styles import Font, PatternFill
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl import Workbook
 
 
 def paint_gradient_bar(widget, event):
@@ -129,7 +134,7 @@ def clear_table(table, row_num):
         :param row_num: The row number to clear
         :type row_num: int
     """
-    for row in range(table.rowCount()):
+    for row in range(table.rowCount()+1):
         for col in range(table.columnCount()):
             table.item(row_num, col).setBackground(QtGui.QColor(220, 220, 220))
             item = table.item(row, col)
@@ -249,6 +254,11 @@ class Classifier(QMainWindow):
         screenshot_button.clicked.connect(self.screenshot)
         self.grid4.addWidget(screenshot_button, 2, 2, 1, 1)
 
+        self.export_button = QPushButton('Export to Excel')
+        self.export_button.setEnabled(False)
+        self.export_button.clicked.connect(lambda: self.export_all_tables())
+        self.grid4.addWidget(self.export_button, 2, 0, 1, 1)
+
         groupbox4.setLayout(self.grid4)
         layout.addWidget(groupbox4, 1, 0, 6, 6)
 
@@ -295,16 +305,9 @@ class Classifier(QMainWindow):
             self.file_names = os.listdir(dir_path)
             self.file_names.sort()
             self.file_selector.addItems(self.file_names)
-
             self.all_data = {}  # create a dictionary to hold all data for all files
-            # # Progress loading bar logic
-            # progress = QProgressDialog("Loading files...", "Cancel", 0, len(self.file_names), self)
-            # progress.setWindowModality(Qt.WindowModality.WindowModal)
-            # progress.setWindowTitle("Loading")
-            # progress.show()
 
             # Loading files
-            # for i, file_name in enumerate(self.file_names):
             for file_name in self.file_names:
                 if os.path.isfile(os.path.join(dir_path, file_name)):
                     self.data_set.setText(os.path.basename(os.path.normpath(dir_path)))
@@ -322,8 +325,6 @@ class Classifier(QMainWindow):
                     except ValueError:
                         QMessageBox.critical(self, "Error", "Cannot load file containing invalid data")
                         break
-                    # progress.setValue(i + 1)
-                    # QCoreApplication.processEvents()  # to update the dialog and allow cancellation
                 else:
                     QMessageBox.critical(self, "Error", "Please select a valid directory")
                     break
@@ -331,6 +332,7 @@ class Classifier(QMainWindow):
             # Call self.data() once after all files have been read and their data has been stored
             self.data(self.all_data)
             self.data_button.setEnabled(True)
+            self.export_button.setEnabled(True)
 
     def create_table(self, width, height, cell, num):
         """
@@ -522,7 +524,6 @@ class Classifier(QMainWindow):
                     cur_individual[inner_key] = inner_dict[inner_key]
         self.all_data[file_name]["individual"] = cur_individual  # store individual data
 
-    # def percentage_data(self, trial_num):
     def percentage_data(self, data):
         """
             Calculates the percentage of transitions between classes and populates a table
@@ -572,7 +573,6 @@ class Classifier(QMainWindow):
 
         # save as dataSet_fileName.png
         if self.data_button.isChecked():
-            print(self.current_field)
             file_name, _ = QFileDialog.getSaveFileName(self, "Save Screenshot", self.data_set.text() + "_" +
                                                        os.path.splitext(self.current_field.text())[0] + ".png",
                                                        "Images (*.png *.xpm *.jpg)")
@@ -581,6 +581,95 @@ class Classifier(QMainWindow):
                                                        "Images (*.png *.xpm *.jpg)")
 
         screenshot.save(file_name)
+
+    def export_all_tables(self):
+        """
+        Exports all tables to an Excel file.
+        """
+        file_dialog = QFileDialog()
+        # save as dataSet_fileName.xlsx
+        file_name = self.data_set.text() + ".xlsx"
+        file_path, _ = file_dialog.getSaveFileName(self, "Save File", file_name, "Excel Files (*.xlsx)")
+        if file_path:
+            writer = pd.ExcelWriter(file_path, engine='openpyxl')
+
+            # Write the first sheet as "All Data"
+            sheet_name = "All Data"
+            self.export_table_to_excel(writer, sheet_name, self.all_tables)
+
+            # Loop through individual data
+            for x in range(len(self.all_data.keys())):
+                data = list(self.all_data.keys())[x]
+                for y in range(len(self.all_tables)):
+                    clear_table(self.all_tables[y], y)
+                self.percentage_data(self.all_data[data]["individual"])
+                sheet_name = data
+                self.export_table_to_excel(writer, sheet_name, self.all_tables)
+
+            writer.close()
+        for x in range(len(self.all_tables)):
+            clear_table(self.all_tables[x], x)
+        self.percentage_data(self.final_dict)
+        QMessageBox.information(self, "Export Successful", "Tables have been exported to Excel.")
+
+
+    def export_table_to_excel(self, writer, sheet_name, tables):
+        """
+        Export a table to an Excel sheet.
+        """
+        for i, table in enumerate(tables):
+            df = self.table_to_dataframe(table)
+            df.to_excel(writer, sheet_name=sheet_name, startrow=i * (df.shape[0] + 2), index=False)
+
+            # Get the workbook and corresponding worksheet
+            workbook = writer.book
+            worksheet = workbook[sheet_name]
+
+            # Apply formatting to row headers (first column)
+            for row in range(df.shape[0]):
+                cell = worksheet.cell(row=i * (df.shape[0] + 2) + row + 2, column=1)
+                cell.fill = openpyxl.styles.PatternFill(fill_type="solid", fgColor="D3D3D3")
+                cell.font = openpyxl.styles.Font(color="000000")
+
+            # Apply formatting to column headers (first row)
+            for col in range(df.shape[1]):
+                cell = worksheet.cell(row=i * (df.shape[0] + 2) + 1, column=col + 1)
+                cell.fill = openpyxl.styles.PatternFill(fill_type="solid", fgColor="D3D3D3")
+                cell.font = openpyxl.styles.Font(color="000000")
+
+            # Apply formatting to specific rows (self-transition rows)
+            self_transition_rows = ['NM->NM', 'WF->WF', 'WE->WE', 'WP->WP', 'WS->WS', 'CG->CG', 'HO->HO']
+            for row in range(df.shape[0]):
+                row_header = df.iloc[row, 0]
+                if row_header in self_transition_rows:
+                    for col in range(1, df.shape[1]):
+                        cell = worksheet.cell(row=i * (df.shape[0] + 2) + row + 2, column=col + 1)
+                        cell.fill = openpyxl.styles.PatternFill(fill_type="solid", fgColor="D3D3D3")
+                        cell.font = openpyxl.styles.Font(color="000000")
+
+    def table_to_dataframe(self, table):
+        """
+        Converts a QTableWidget to a pandas DataFrame.
+        :param table: The QTableWidget object
+        :type table: QTableWidget
+        :return: The corresponding DataFrame
+        :rtype: pd.DataFrame
+        """
+        column_headers = [table.horizontalHeaderItem(i).text() for i in range(table.columnCount())]
+        row_headers = [table.verticalHeaderItem(i).text() for i in range(table.rowCount())]
+        data = []
+        for row in range(table.rowCount()):
+            row_data = []
+            for col in range(table.columnCount()):
+                item = table.item(row, col)
+                if item is not None:
+                    row_data.append(item.text())
+                else:
+                    row_data.append('')
+            data.append(row_data)
+        df = pd.DataFrame(data, columns=column_headers)
+        df.insert(0, '', row_headers)  # Insert row headers as the first column
+        return df
 
 
 if __name__ == "__main__":
