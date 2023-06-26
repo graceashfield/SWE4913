@@ -9,9 +9,7 @@ import openpyxl
 from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QGroupBox, QLabel, QGridLayout, \
     QMainWindow, QWidget, QPushButton, QFileDialog, QMessageBox, QFrame, QAbstractItemView, QLineEdit, QComboBox, \
     QProgressDialog
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils.dataframe import dataframe_to_rows
-from openpyxl import Workbook
+from openpyxl.styles import Font
 
 
 def paint_gradient_bar(widget, event):

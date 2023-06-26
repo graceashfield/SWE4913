@@ -5,6 +5,8 @@ This code provides a graphical user interface (GUI) for an EMG classifier. It al
 This code requires the following libraries to be installed:
 - PyQt6
 - numpy
+- pandas
+- openpyxl
 
 ### Running the program
 To use the EMG Classifier, follow these steps:
